@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: faucet-deployment
+  labels:
+    app: faucet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: faucet
+  template:
+    metadata:
+      labels:
+        app: faucet
+    spec:
+      containers:
+        - name: faucet
+          image: neonlabsorg/proxy
+          command: ["./run-test-faucet.sh"]
+          ports:
+            - containerPort: 3333
+          env:
+            - name: FAUCET_RPC_PORT
+              value: "3333"
+            - name: FAUCET_RPC_ALLOWED_ORIGINS
+              value: '["http://airdropper"]'
+            - name: FAUCET_WEB3_ENABLE
+              value: 'false'
+            - name: WEB3_RPC_URL
+              value: 'http://proxy-service:9090/solana'
+#            - name: WEB3_PRIVATE_KEY
+#              value: ""
+#            - name: NEON_ERC20_TOKENS
+#              value: ""
+            - name: NEON_ERC20_MAX_AMOUNT
+              value: "1000"
+            - name: FAUCET_SOLANA_ENABLE
+              value: 'true'
+            - name: SOLANA_URL
+              value: 'http://solana-svc:8899'
+            - name: NEON_OPERATOR_KEYFILE
+              value: '/root/.config/solana/id.json'
+            - name: NEON_ETH_MAX_AMOUNT
+              value: "1000"
+            - name: TEST_FAUCET_INIT_NEON_BALANCE
+              value: "100000"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: faucet-service
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: external
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+spec:
+  selector:
+    app: faucet
+  type: LoadBalancer
+  ports:
+    - protocol: TCP
+      port: 3333
+      targetPort: 3333
+      name: "http"

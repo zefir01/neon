@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "neon-chart.fullname" . }}-postgres-svc
+  labels:
+    {{- include "neon-chart.labels" . | nindent 4 }}
+spec:
+  type: ExternalName
+  externalName: {{ .Values.postgresHost }}
+  ports:
+    - port: 5432
+      name: tcp5432
+---
+kind: Endpoints
+apiVersion: v1
+metadata:
+  name: {{ include "neon-chart.fullname" . }}-solana-svc
+subsets:
+  - addresses:
+      - ip: {{ .Values.solanaIp }}
+    ports:
+      - port: 8899
+        name: tcp8899
+      - port: 8900
+        name: tcp8900
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "neon-chart.fullname" . }}-solana-svc
+  labels:
+    {{- include "neon-chart.labels" . | nindent 4 }}
+spec:
+  ports:
+    - port: 8899
+      name: tcp8899
+      targetPort: tcp8899
+    - port: 8900
+      name: tcp8900
+      targetPort: tcp8900
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "neon-chart.fullname" . }}-postgres-secret
+  labels:
+    {{- include "neon-chart.labels" . | nindent 4 }}
+type: Opaque
+data:
+  password: {{ .Values.postgresPass }}
+
+{{- define "neon-chart.solana-svc" -}}
+{{- $name := include "neon-chart.fullname" . }}
+{{- printf "%s-%s" .Chart.Name "solana-svc" | replace "+" "_" | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{- define "neon-chart.postgres-svc" -}}
+{{- $name := include "neon-chart.fullname" . }}
+{{- printf "%s-%s" .Chart.Name "postgres-svc" | replace "+" "_" | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{- define "neon-chart.postgres-secret" -}}
+{{- $name := include "neon-chart.fullname" . }}
+{{- printf "%s-%s" .Chart.Name "postgres-secret" | replace "+" "_" | trunc 63 | trimSuffix "-" }}
+{{- end }}

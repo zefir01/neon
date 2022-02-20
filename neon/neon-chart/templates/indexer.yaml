@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "neon-chart.fullname" . }}-indexer
+  labels:
+    {{- include "neon-chart.labels" . | nindent 4 }}
+    app: indexer
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "neon-chart.selectorLabels" . | nindent 6 }}
+      app: indexer
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "neon-chart.selectorLabels" . | nindent 8 }}
+        app: indexer
+    spec:
+      containers:
+        - name: indexer
+          image: neonlabsorg/proxy
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["proxy/run-indexer.sh"]
+          ports:
+            - name: http
+              containerPort: 9090
+              protocol: TCP
+          env:
+            - name: SOLANA_URL
+              value: http://{{- include "neon-chart.solana-svc" . }}:8899
+            - name: POSTGRES_HOST
+              value: "{{- include "neon-chart.postgres-svc" . }}"
+            - name: POSTGRES_DB
+              value: "{{ .Values.postgresDB }}"
+            - name: POSTGRES_USER
+              value: "{{ .Values.postgresUser }}"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "{{- include "neon-chart.postgres-secret" . }}"
+                  key: password
+            - name: CONFIG
+              value: "ci"
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

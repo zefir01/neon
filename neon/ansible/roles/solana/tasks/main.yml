@@ -1,0 +1,71 @@
+- sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: yes
+    sysctl_set: yes
+  with_items:
+    - { name: 'net.core.rmem_default', value: '134217728' }
+    - { name: 'net.core.rmem_max', value: '134217728' }
+    - { name: 'net.core.wmem_default', value: '134217728' }
+    - { name: 'net.core.wmem_max', value: '134217728' }
+    - { name: 'vm.max_map_count', value: '1000000' }
+
+- name: Ensure a list of yum packages are installed
+  yum:
+    name: "{{ packages }}"
+    state: latest
+    update_cache: yes
+  vars:
+    packages:
+     - python-pip
+     - yum-utils
+     - device-mapper-persistent-data
+     - amazon-linux-extras
+
+- name: Install pip packages
+  pip:
+    name: docker #docker docker-py
+    state: present
+    extra_args: --ignore-installed
+
+- name: Add extras repository
+  shell: yum-config-manager --enable extras
+
+- name: Install docker-ce (centos) via amazon-linux-extras packages
+  shell: "amazon-linux-extras install docker -y"
+
+- name: Enable Docker CE service at startup
+  service:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Start Solana container
+  docker_container:
+    state: started
+    name: solana
+    image: neonlabsorg/solana:v1.8.12-testnet
+    #image: busybox
+    ports:
+      - "8899:8899"
+      - "9900:9900"
+      - "8900:8900"
+      - "8001:8001"
+      - "8001-8009:8001-8009/udp"
+    env:
+      SOLANA_URL: http://solana:8899
+      RUST_LOG: solana_runtime::system_instruction_processor=trace,solana_runtime::message_processor=debug,solana_bpf_loader=debug,solana_rbpf=debug
+    ulimits:
+      - 'nofile:1000000:1000000'
+    healthcheck:
+      test: [ CMD-SHELL, "solana cluster-version -u http://solana:8899" ]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
+    log_driver: awslogs
+    log_options:
+      awslogs-region: eu-central-1
+      awslogs-group: SolanaDocker
+      awslogs-create-group: true

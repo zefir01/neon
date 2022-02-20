@@ -1,0 +1,10 @@
+- name: Read config
+  set_fact:
+    conf: "{{ lookup('file', role_path+'/files/cw_config.json') | from_json }}"
+
+- name: Install cloudwatch agent
+  import_role:
+    name: christiangda.amazon_cloudwatch_agent
+  vars:
+    cwa_agent_mode: "ec2"
+    cwa_conf_json_file_content: "{{conf}}"

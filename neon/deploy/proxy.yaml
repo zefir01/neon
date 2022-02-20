@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: proxy-deployment
+  labels:
+    app: proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: proxy
+  template:
+    metadata:
+      labels:
+        app: proxy
+    spec:
+      containers:
+        - name: proxy
+          image: neonlabsorg/proxy
+          command: ["proxy/run-test-proxy.sh"]
+          ports:
+            - containerPort: 9090
+          env:
+            - name: SOLANA_URL
+              value: "http://solana-svc:8899"
+            - name: FAUCET_URL
+              value: "http://faucet-service:3333"
+            - name: POSTGRES_HOST
+              value: "postgres-svc"
+            - name: POSTGRES_DB
+              value: "neon"
+            - name: POSTGRES_USER
+              value: "neon_proxy"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-password
+                  key: password
+            - name: LOG_SENDING_SOLANA_TRANSACTION
+              value: "YES"
+            - name: LOG_NEON_CLI_DEBUG
+              value: "YES"
+            - name: FUZZING_BLOCKHASH
+              value: "YES"
+            - name: CONFIG
+              value: "ci"
+            - name: PP_SOLANA_URL
+              value: "https://api.devnet.solana.com"
+            - name: PYTH_MAPPING_ACCOUNT
+              value: "BmA9Z6FjioHJPpjT39QazZyhDRUdZy2ezwx4GiDdE2u2"
+            - name: MIN_OPERATOR_BALANCE_TO_WARN
+              value: "4565760000" # = 913152000 * 5 (5 storage accounts) = 4.56576 SOL
+            - name: MIN_OPERATOR_BALANCE_TO_ERR
+              value: "913152000" # = solana rent 131072 (= Rent-exempt minimum: 0.913152 SOL) SOLs to create a storage
+            - name: MINIMAL_GAS_PRICE
+              value: "1"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: proxy-service
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: external
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+spec:
+  selector:
+    app: nginx
+  type: LoadBalancer
+  ports:
+    - protocol: TCP
+      port: 9090
+      targetPort: 9090
+      name: "http"

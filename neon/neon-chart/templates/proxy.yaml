@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "neon-chart.fullname" . }}-proxy
+  labels:
+    {{- include "neon-chart.labels" . | nindent 4 }}
+    app: proxy
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "neon-chart.selectorLabels" . | nindent 6 }}
+      app: proxy
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "neon-chart.selectorLabels" . | nindent 8 }}
+        app: proxy
+    spec:
+      containers:
+        - name: proxy
+          image: neonlabsorg/proxy
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["proxy/run-test-proxy.sh"]
+          ports:
+            - name: http
+              containerPort: 9090
+              protocol: TCP
+          env:
+            - name: SOLANA_URL
+              value: http://{{- include "neon-chart.solana-svc" . }}:8899
+            - name: FAUCET_URL
+              value: http://{{- include "neon-chart.faucet-svc" . }}:3333
+            - name: POSTGRES_HOST
+              value: "{{- include "neon-chart.postgres-svc" . }}"
+            - name: POSTGRES_DB
+              value: "{{ .Values.postgresDB }}"
+            - name: POSTGRES_USER
+              value: "{{ .Values.postgresUser }}"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "{{- include "neon-chart.postgres-secret" . }}"
+                  key: password
+            - name: LOG_SENDING_SOLANA_TRANSACTION
+              value: "YES"
+            - name: LOG_NEON_CLI_DEBUG
+              value: "YES"
+            - name: FUZZING_BLOCKHASH
+              value: "YES"
+            - name: CONFIG
+              value: "ci"
+            - name: PP_SOLANA_URL
+              value: "https://api.devnet.solana.com"
+            - name: PYTH_MAPPING_ACCOUNT
+              value: "BmA9Z6FjioHJPpjT39QazZyhDRUdZy2ezwx4GiDdE2u2"
+            - name: MIN_OPERATOR_BALANCE_TO_WARN
+              value: "4565760000" # = 913152000 * 5 (5 storage accounts) = 4.56576 SOL
+            - name: MIN_OPERATOR_BALANCE_TO_ERR
+              value: "913152000" # = solana rent 131072 (= Rent-exempt minimum: 0.913152 SOL) SOLs to create a storage
+            - name: MINIMAL_GAS_PRICE
+              value: "1"
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: " {{- include "neon-chart.proxy-svc" . }}"
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: external
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+spec:
+  selector:
+    {{- include "neon-chart.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/app: proxy
+  type: LoadBalancer
+  ports:
+    - protocol: TCP
+      port: 9090
+      targetPort: 9090
+      name: "http"
+
+{{- define "neon-chart.proxy-svc" -}}
+{{- $name := include "neon-chart.fullname" . }}
+{{- printf "%s-%s" .Chart.Name "proxy-svc" | replace "+" "_" | trunc 63 | trimSuffix "-" }}
+{{- end }}

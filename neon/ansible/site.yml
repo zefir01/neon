@@ -1,0 +1,8 @@
+- hosts: solana
+  roles:
+    - { role: cloudwatch, tags: cloudwatch }
+    - { role: solana, tags: solana }
+- hosts: grafana
+  roles:
+    - { role: cloudwatch, tags: cloudwatch }
+    - { role: grafana, tags: grafana }

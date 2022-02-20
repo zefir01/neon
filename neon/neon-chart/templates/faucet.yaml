@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "neon-chart.fullname" . }}-faucet
+  labels:
+    {{- include "neon-chart.labels" . | nindent 4 }}
+    app: faucet
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "neon-chart.selectorLabels" . | nindent 6 }}
+      app: faucet
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "neon-chart.selectorLabels" . | nindent 8 }}
+        app: faucet
+    spec:
+      containers:
+        - name: faucet
+          image: neonlabsorg/proxy
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["./run-test-faucet.sh"]
+          ports:
+            - name: http
+              containerPort: 3333
+              protocol: TCP
+          env:
+            - name: FAUCET_RPC_PORT
+              value: "3333"
+            - name: FAUCET_RPC_ALLOWED_ORIGINS
+              value: '["http://airdropper"]'
+            - name: FAUCET_WEB3_ENABLE
+              value: 'false'
+            - name: WEB3_RPC_URL
+              value: http://{{- include "neon-chart.proxy-svc" . }}:9090/solana
+#            - name: WEB3_PRIVATE_KEY
+#              value: ""
+#            - name: NEON_ERC20_TOKENS
+#              value: ""
+            - name: NEON_ERC20_MAX_AMOUNT
+              value: "1000"
+            - name: FAUCET_SOLANA_ENABLE
+              value: 'true'
+            - name: SOLANA_URL
+              value: http://{{- include "neon-chart.solana-svc" . }}:8899
+            - name: NEON_OPERATOR_KEYFILE
+              value: '/root/.config/solana/id.json'
+            - name: NEON_ETH_MAX_AMOUNT
+              value: "1000"
+            - name: TEST_FAUCET_INIT_NEON_BALANCE
+              value: "100000"
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: " {{- include "neon-chart.faucet-svc" . }}"
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: external
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+spec:
+  selector:
+    {{- include "neon-chart.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/app: faucet
+  type: LoadBalancer
+  ports:
+    - protocol: TCP
+      port: 3333
+      targetPort: 3333
+      name: "http"
+
+{{- define "neon-chart.faucet-svc" -}}
+{{- $name := include "neon-chart.fullname" . }}
+{{- printf "%s-%s" .Chart.Name "faucet-svc" | replace "+" "_" | trunc 63 | trimSuffix "-" }}
+{{- end }}

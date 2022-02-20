@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airdropper-deployment
+  labels:
+    app: airdropper
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airdropper
+  template:
+    metadata:
+      labels:
+        app: airdropper
+    spec:
+      containers:
+        - name: airdropper
+          image: neonlabsorg/proxy
+          command: ["./run-airdropper.sh"]
+          ports:
+            - containerPort: 3333
+          env:
+            - name: POSTGRES_HOST
+              value: "postgres-svc"
+            - name: POSTGRES_DB
+              value: "neon"
+            - name: POSTGRES_USER
+              value: "neon_proxy"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-password
+                  key: password
+            - name: SOLANA_URL
+              value: "http://solana-svc:8899"
+            - name: FAUCET_URL
+              value: "http://faucet-service:3333"
+            - name: NEON_CLI_TIMEOUT
+              value: "0.9"
+            - name: INDEXER_ERC20_WRAPPER_WHITELIST
+              value: "ANY"
+            - name: PRICE_UPDATE_INTERVAL
+              value: "10"
+            - name: START_SLOT
+              value: "LATEST"
+            - name: PP_SOLANA_URL
+              value: "https://api.devnet.solana.com"
+            - name: PYTH_MAPPING_ACCOUNT
+              value: "BmA9Z6FjioHJPpjT39QazZyhDRUdZy2ezwx4GiDdE2u2"
+            - name: MAX_CONFIDENCE_INTERVAL
+              value: "0.01"

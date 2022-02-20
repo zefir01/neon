@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: evm-loader-deployment
+  labels:
+    app: evm-loader
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: evm-loader
+  template:
+    metadata:
+      labels:
+        app: evm-loader
+    spec:
+      containers:
+        - name: evm-loader
+          image: neonlabsorg/evm_loader:latest
+          command: ["bash", "-c", "create-test-accounts.sh 1 && deploy-evm.sh"]
+          ports:
+            - containerPort: 80
+          env:
+            - name: SOLANA_URL
+              value: "http://solana-svc:8899"

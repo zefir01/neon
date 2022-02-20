@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "neon-chart.fullname" . }}-airdropper
+  labels:
+    {{- include "neon-chart.labels" . | nindent 4 }}
+    app: airdropper
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "neon-chart.selectorLabels" . | nindent 6 }}
+      app: airdropper
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "neon-chart.selectorLabels" . | nindent 8 }}
+        app: airdropper
+    spec:
+      containers:
+        - name: airdropper
+          image: neonlabsorg/proxy
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["./run-airdropper.sh"]
+          ports:
+            - name: http
+              containerPort: 3333
+              protocol: TCP
+          env:
+            - name: SOLANA_URL
+              value: http://{{- include "neon-chart.solana-svc" . }}:8899
+            - name: FAUCET_URL
+              value: http://{{- include "neon-chart.faucet-svc" . }}:3333
+            - name: POSTGRES_HOST
+              value: "{{- include "neon-chart.postgres-svc" . }}"
+            - name: POSTGRES_DB
+              value: "{{ .Values.postgresDB }}"
+            - name: POSTGRES_USER
+              value: "{{ .Values.postgresUser }}"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "{{- include "neon-chart.postgres-secret" . }}"
+                  key: password
+            - name: NEON_CLI_TIMEOUT
+              value: "0.9"
+            - name: INDEXER_ERC20_WRAPPER_WHITELIST
+              value: "ANY"
+            - name: PRICE_UPDATE_INTERVAL
+              value: "10"
+            - name: START_SLOT
+              value: "LATEST"
+            - name: PP_SOLANA_URL
+              value: "https://api.devnet.solana.com"
+            - name: PYTH_MAPPING_ACCOUNT
+              value: "BmA9Z6FjioHJPpjT39QazZyhDRUdZy2ezwx4GiDdE2u2"
+            - name: MAX_CONFIDENCE_INTERVAL
+              value: "0.01"
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,60 @@
+- name: Ensure a list of yum packages are installed
+  yum:
+    name: "{{ packages }}"
+    state: latest
+    update_cache: yes
+  vars:
+    packages:
+     - python-pip
+     - yum-utils
+     - device-mapper-persistent-data
+     - amazon-linux-extras
+
+- name: Install pip packages
+  pip:
+    name: docker #docker docker-py
+    state: present
+    extra_args: --ignore-installed
+
+- name: Add extras repository
+  shell: yum-config-manager --enable extras
+
+- name: Install docker-ce (centos) via amazon-linux-extras packages
+  shell: "amazon-linux-extras install docker -y"
+
+- name: Enable Docker CE service at startup
+  service:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Extract grafana
+  unarchive:
+    src: "{{role_path}}/files/grafana.tar.gz"
+    dest: /root
+
+- name: Set grafana data permissions
+  file:
+    path: /root/grafana
+    state: directory
+    recurse: yes
+    owner: 472
+    group: root
+
+- name: Start Grafana container
+  docker_container:
+    state: started
+    name: grafana
+    image: grafana/grafana-oss:main-ubuntu
+    #image: busybox
+    ports:
+      - "3000:3000"
+    volumes: "/root/grafana:/var/lib/grafana"
+    env:
+      GF_LOG_MODE: "console file"
+      GF_AWS_default_REGION: "eu-central-1"
+    log_driver: awslogs
+    log_options:
+      awslogs-region: eu-central-1
+      awslogs-group: GrafanaDocker
+      awslogs-create-group: true

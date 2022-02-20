@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "neon-chart.fullname" . }}-evm-loader
+  labels:
+    {{- include "neon-chart.labels" . | nindent 4 }}
+    app: evm-loader
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "neon-chart.selectorLabels" . | nindent 6 }}
+      app: evm-loader
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "neon-chart.selectorLabels" . | nindent 8 }}
+        app: evm-loader
+    spec:
+      containers:
+        - name: evm-loader
+          image: neonlabsorg/evm_loader:latest
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["bash", "-c", "create-test-accounts.sh 1 && deploy-evm.sh"]
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          env:
+            - name: SOLANA_URL
+              value: http://{{- include "neon-chart.solana-svc" . }}:8899
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
